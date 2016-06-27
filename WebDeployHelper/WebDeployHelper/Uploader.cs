@@ -1,5 +1,9 @@
 ﻿using System;
-using WinSCP;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Xml;
+using System.Xml.XPath;
 
 namespace WebDeployHelper
 {
@@ -14,74 +18,77 @@ namespace WebDeployHelper
             Config = config;
         }
 
-        public void UploadLocalDirectory(Session session, string remotePath, TransferOptions transferOptions)
+        public void Upload()
         {
-            // Construct folder with permissions first
-            try
-            {
-                session.SynchronizeDirectories(SynchronizationMode.Remote, Config.ConfigDirUpload, remotePath, IsToRemoveAfterUpload,
-                    options: transferOptions);
-            }
-            catch (InvalidOperationException)
-            {
-                if (session.Opened)
-                {
-                    Util.IgnoreException();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            var winscp = new Process();
+            winscp.StartInfo.FileName = "winscp.com";
+            winscp.StartInfo.Arguments = "/xmllog=\"" + TextCollection.FileXmlLogName + "\"";
+            winscp.StartInfo.UseShellExecute = false;
+            winscp.StartInfo.CreateNoWindow = true;
+            winscp.StartInfo.RedirectStandardInput = true;
+            winscp.Start();
 
-            var synchronizeResult = session.SynchronizeDirectories(SynchronizationMode.Remote, Config.ConfigDirUpload, remotePath,
-                IsToRemoveAfterUpload, options: transferOptions);
-            synchronizeResult.Check();
+            var writer = winscp.StandardInput;
+
+            WriteUploadCommands(writer);
+
+            writer.Close();
+            winscp.WaitForExit();
+
+            CheckForError();
         }
 
-        public TransferOptions SetupTransferOptions()
+        private void WriteUploadCommands(StreamWriter writer)
         {
-            var transferOptions = new TransferOptions { TransferMode = TransferMode.Binary };
-            var permissions = new FilePermissions { Octal = "644" };
-            transferOptions.FilePermissions = permissions;
-            return transferOptions;
-        }
+            writer.WriteLine("open sftp://" + Config.ConfigSftpUser + "@" + Config.ConfigSftpAddress + ":22 -hostkey=\"*\"");
 
-        public string SetupRemotePath()
-        {
-            var versionToUpload = Config.ConfigReleaseType;
-            switch (versionToUpload)
-            {
-                case TextCollection.Const.VarDev:
-                    return Config.ConfigDevPath;
-                case TextCollection.Const.VarRelease:
-                    return Config.ConfigReleasePath;
-                default:
-                    Util.DisplayWarning("Incorrect release type!", new Exception());
-                    //dummy return, won't reach
-                    return Config.ConfigDevPath;
-            }
-        }
-        
-        public SessionOptions GetSessionOptions()
-        {
             string password = null;
             while (password == null || password.Trim() == "")
             {
-                Console.Write(TextCollection.Const.InfoEnterPassword);
+                Console.Write(TextCollection.InfoEnterPassword);
                 password = Util.ReadPassword();
             }
+            writer.WriteLine(password);
+            password = null;
 
-            var sessionOptions = new SessionOptions
+            writer.WriteLine("option confirm off");
+            writer.WriteLine("put -permissions=" + TextCollection.PermissionsFile + " -transfer=binary \"" + Config.ConfigDirUpload
+                + "\" \"" + Config.RemotePath + "\"");
+
+            var directoryInfos = new DirectoryInfo(Config.ConfigDirUpload).EnumerateDirectories("*", SearchOption.AllDirectories);
+
+            foreach (var directoryInfo in directoryInfos)
             {
-                Protocol = Protocol.Sftp,
-                HostName = Config.ConfigSftpAddress,
-                UserName = Config.ConfigSftpUser,
-                Password = password,
-                PortNumber = 22, //TODO: make it configurable
-                GiveUpSecurityAndAcceptAnySshHostKey = true
-            };
-            return sessionOptions;
+                string remoteDirectoryPath = Config.RemotePath + directoryInfo.FullName.Replace(Config.ConfigDirUpload, "").Replace("\\", "/");
+
+                writer.WriteLine("chmod " + TextCollection.PermissionsDirectory + " \"" + remoteDirectoryPath + "\"");
+            }
+            
+            writer.WriteLine("exit");
+        }
+
+        private void CheckForError()
+        {
+            var log = new XPathDocument(TextCollection.FileXmlLogName);
+            var xmlNamespace = new XmlNamespaceManager(new NameTable());
+            xmlNamespace.AddNamespace("w", "http://winscp.net/schema/session/1.0");
+            var navigator = log.CreateNavigator();
+            var iterator = navigator.Select("//w:message", xmlNamespace);
+
+            if (iterator.Count > 0)
+            {
+                var errorMessage = new StringBuilder();
+                foreach (XPathNavigator message in iterator)
+                {
+                    errorMessage.AppendLine(message.Value);
+                }
+
+                throw new Exception(errorMessage.ToString());
+            }
+            else
+            {
+                Console.WriteLine(TextCollection.DoneUploaded);
+            }
         }
     }
 }

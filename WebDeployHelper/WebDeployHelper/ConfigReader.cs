@@ -6,8 +6,7 @@ namespace WebDeployHelper
     class ConfigReader
     {
         #region Read Config
-
-        private readonly string _currentDirectory;
+        
         private readonly string _configDirectory;
         
         private static string _configDirUpload;
@@ -16,6 +15,8 @@ namespace WebDeployHelper
         private static string _configSftpUser;
         private static string _configDevPath;
         private static string _configReleasePath;
+
+        private static string _remotePath;
 
         public ConfigReader()
         {
@@ -31,19 +32,9 @@ namespace WebDeployHelper
         {
             //Sequence matters
             InitConfigVariables();
+            InitRemotePath();
             InitDeployInfo();
             return this;
-        }
-
-        public override string ToString()
-        {
-            return
-                "ConfigDirUpload: " + _configDirUpload + "\r\n" +
-                "ConfigReleaseType: " + _configReleaseType + "\r\n" +
-                "ConfigSftpAddress: " + _configSftpAddress + "\r\n" +
-                "ConfigSftpUser: " + _configSftpUser + "\r\n" +
-                "ConfigDevPath: " + _configDevPath + "\r\n" +
-                "ConfigReleasePath: " + _configReleasePath + "\r\n";
         }
 
         public DeployConfig ToDeployConfig()
@@ -54,8 +45,7 @@ namespace WebDeployHelper
                 ConfigReleaseType = _configReleaseType,
                 ConfigSftpAddress = _configSftpAddress,
                 ConfigSftpUser = _configSftpUser,
-                ConfigDevPath = _configDevPath,
-                ConfigReleasePath = _configReleasePath
+                RemotePath = _remotePath
             };
             return config;
         }
@@ -69,7 +59,7 @@ namespace WebDeployHelper
             }
             catch (Exception e)
             {
-                Util.DisplayWarning(TextCollection.Const.ErrorNoConfig, e);
+                Util.DisplayWarning(TextCollection.ErrorNoConfig, e);
             }
 
             //index here refers to the line number in DeployHelper.conf
@@ -81,14 +71,31 @@ namespace WebDeployHelper
             _configReleasePath = configContent[11];
         }
 
+        private void InitRemotePath()
+        {
+            switch (_configReleaseType)
+            {
+                case TextCollection.VarRelease:
+                    _remotePath = _configReleasePath;
+                    break;
+                case TextCollection.VarDev:
+                    _remotePath = _configDevPath;
+                    break;
+                default:
+                    Util.DisplayWarning(TextCollection.ErrorInvalidReleaseType, new Exception());
+                    break;
+            }
+        }
+
         private void InitDeployInfo()
         {
-            PrintInfo("You are going to deploy PowerPointLabs Website\r\n");
-            Console.Write("Settings info:\n");
+            PrintInfo("You are going to deploy PowerPointLabs Website");
+            PrintInfo("");
+            PrintInfo("Settings info:");
             PrintInfo("Upload Directory: ", _configDirUpload);
             PrintInfo("Release Type: ", _configReleaseType);
-            PrintInfo("Dev Path: ", _configDevPath);
-            PrintInfo("Release Path: ", _configReleasePath);
+            PrintInfo("Remote Path: ", _remotePath);
+            PrintInfo("");
         }
 
         private void PrintInfo(string text, string highlightedText = "")

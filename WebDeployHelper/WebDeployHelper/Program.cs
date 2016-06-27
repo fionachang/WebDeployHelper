@@ -20,7 +20,7 @@
 //  - Dev path is the installation folder path on the server for dev version PowerPointLabs Website
 //  - Release path is the installation folder path on the server for release version PowerPointLabs Website
 //
-//  2. Copy WebDeployHelper.exe, WebDeployHelper.conf, WinSCP.exe and WinSCPnet.dll from the output folder to the publish folder
+//  2. Copy WebDeployHelper.exe, WebDeployHelper.conf, WinSCP.exe and WinSCP.com from the output folder to the publish folder
 //
 //  3. Run WebDeployHelper.exe and follow the instructions.
 //
@@ -45,7 +45,6 @@ namespace WebDeployHelper
                 var config = new ConfigReader()
                     .ReadConfig()
                     .ToDeployConfig();
-                config.VerifyConfig();
 
                 # endregion
                 

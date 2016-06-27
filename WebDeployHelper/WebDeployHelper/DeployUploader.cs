@@ -1,5 +1,4 @@
 ﻿using System;
-using WinSCP;
 
 namespace WebDeployHelper
 {
@@ -18,34 +17,15 @@ namespace WebDeployHelper
         {
             try
             {
-                using (var session = new Session())
-                {
-                    Console.WriteLine("\nConnecting the server...");
-                    var uploader = new Uploader();
-                    uploader.SetConfig(_config);
-                    session.Open(uploader.GetSessionOptions());
-                    if (session.Opened)
-                    {
-                        Util.DisplayDone(TextCollection.Const.DoneSftpConnected);
-                        Console.WriteLine(TextCollection.Const.InfoFileUploading);
-
-                        var remotePath = uploader.SetupRemotePath();
-                        var transferOptions = uploader.SetupTransferOptions();
-                        
-                        uploader.UploadLocalDirectory(session, remotePath, transferOptions);
-
-                        Util.DisplayDone(TextCollection.Const.DoneUploaded);
-                    }
-                    else
-                    {
-                        Util.DisplayWarning(TextCollection.Const.ErrorNetworkFailed, new InvalidOperationException());
-                    }
-                }
+                Console.WriteLine("Connecting the server...");
+                var uploader = new Uploader();
+                uploader.SetConfig(_config);
+                uploader.Upload();
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error during SFTP uploading: {0}", e);
-                Util.DisplayWarning(TextCollection.Const.ErrorNetworkFailed, e);
+                Console.WriteLine("Error during SFTP uploading:");
+                Util.DisplayWarning(e.Message, e);
             }
         }
 
